@@ -1,0 +1,60 @@
+name: Sync YouTube Stats
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # every 1 hour
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run script
+        run: |
+          npm init -y
+          npm install axios firebase-admin
+
+          node <<EOF
+          const admin = require("firebase-admin");
+          const axios = require("axios");
+
+          const serviceAccount = JSON.parse(process.env.FIREBASE_KEY);
+
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+          });
+
+          const db = admin.firestore();
+
+          const API_KEY = process.env.YT_API_KEY;
+          const CHANNEL_ID = process.env.CHANNEL_ID;
+
+          async function run() {
+            const res = await axios.get(
+              \`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=\${CHANNEL_ID}&key=\${API_KEY}\`
+            );
+
+            const subs = parseInt(res.data.items[0].statistics.subscriberCount);
+
+            // 🔥 your logic
+            const rare = Math.min(1, subs / 1000);
+            const legendary = Math.min(1, subs / 10000);
+
+            await db.collection("config").doc("giveaways").set({
+              rare_progress: Number(rare.toFixed(3)),
+              legendary_progress: Number(legendary.toFixed(3)),
+              live_yt_subs: subs,
+              last_synced: new Date()
+            }, { merge: true });
+
+            console.log("Updated subs:", subs);
+          }
+
+          run();
+          EOF
+
+        env:
+          FIREBASE_KEY: ${{ secrets.FIREBASE_KEY }}
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
