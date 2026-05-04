@@ -39,9 +39,19 @@ jobs:
               const subs = parseInt(res.data.items[0].statistics.subscriberCount);
 
               // 2. 🔥 THE MATH ENGINE (Adjust the denominators to whatever your actual goals are!)
-              const rare = Math.min(1.0, subs / 300);
-              const legendary = Math.min(1.0, subs / 500);
-              const goldPass = Math.min(1.0, subs / 400); // <-- THE GOLD PASS MATH!
+
+              const configSnap = await db.collection("config").doc("giveaways").get();
+              const config = configSnap.data();
+
+              // 🔥 read goals dynamically
+              const rareGoal = parseInt(config.yt_goal_text || "300");
+              const legendaryGoal = parseInt(config.diamond_yt_goal_text || "500");
+              const goldPassGoal = parseInt(config.gold_pass_goal_text || "400");
+  
+              // 🔥 calculate
+              const rare = Math.min(1.0, subs / rareGoal);
+              const legendary = Math.min(1.0, subs / legendaryGoal);
+              const goldPass = Math.min(1.0, subs / goldPassGoal);
 
               // (Optional) If you are updating IG manually for now, we just don't touch epic/common here.
               // But if you ever automate them, you'd calculate them here.
