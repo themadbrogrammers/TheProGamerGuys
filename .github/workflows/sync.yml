@@ -32,40 +32,92 @@ jobs:
 
           async function run() {
             try {
-              // 1. Fetch YouTube Subs
+              // ==========================================
+              // 1. YOUTUBE MILESTONE ENGINE
+              // ==========================================
               const res = await axios.get(
                 \`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=\${CHANNEL_ID}&key=\${API_KEY}\`
               );
               const subs = parseInt(res.data.items[0].statistics.subscriberCount);
 
-              // 2. 🔥 THE MATH ENGINE (Adjust the denominators to whatever your actual goals are!)
-
               const configSnap = await db.collection("config").doc("giveaways").get();
-              const config = configSnap.data();
+              const config = configSnap.data() || {};
 
-              // 🔥 read goals dynamically
               const rareGoal = parseInt(config.yt_goal_text || "300");
               const legendaryGoal = parseInt(config.diamond_yt_goal_text || "500");
               const goldPassGoal = parseInt(config.gold_pass_goal_text || "400");
   
-              // 🔥 calculate
               const rare = Math.min(1.0, subs / rareGoal);
               const legendary = Math.min(1.0, subs / legendaryGoal);
               const goldPass = Math.min(1.0, subs / goldPassGoal);
 
-              // (Optional) If you are updating IG manually for now, we just don't touch epic/common here.
-              // But if you ever automate them, you'd calculate them here.
-
-              // 3. Push to Firebase
               await db.collection("config").doc("giveaways").set({
                 rare_progress: Number(rare.toFixed(3)),
                 legendary_progress: Number(legendary.toFixed(3)),
-                gold_pass_progress: Number(goldPass.toFixed(3)), // <-- INJECTED HERE!
+                gold_pass_progress: Number(goldPass.toFixed(3)),
                 live_yt_subs: subs,
                 last_synced: new Date()
-              }, { merge: true }); // Merge ensures we don't accidentally delete Epic/Common!
+              }, { merge: true });
 
               console.log("✅ Matrix Synced. Subs:", subs);
+
+              // ==========================================
+              // 2. GLOBAL THREAT LEVEL & RANKING ENGINE
+              // ==========================================
+              const usersSnap = await db.collection("users").get();
+              let usersList = [];
+
+              // Calculate Threat Level for all users
+              usersSnap.forEach(doc => {
+                const data = doc.data();
+                const coins = data.coins || 0;
+                const streak = data.streak || 0;
+                const luck = data.luck_multiplier || 0;
+                const oldRank = data.rank || 0;
+                
+                // Threat Formula
+                const threatLevel = Math.floor((coins * 0.1) + (streak * 50) + (luck * 100));
+                
+                usersList.push({
+                  ref: doc.ref,
+                  threatLevel: threatLevel,
+                  oldRank: oldRank
+                });
+              });
+
+              // Sort highest to lowest
+              usersList.sort((a, b) => b.threatLevel - a.threatLevel);
+
+              // Create batches (Firestore limit is 500 ops per batch)
+              const batches = [db.batch()];
+              let operationCounter = 0;
+              let batchIndex = 0;
+
+              // Assign ranks and queue updates
+              usersList.forEach((user, index) => {
+                const newRank = index + 1; // Rank 1, 2, 3...
+
+                batches[batchIndex].update(user.ref, {
+                  threat_level: user.threatLevel,
+                  rank: newRank,
+                  previous_rank: user.oldRank
+                });
+
+                operationCounter++;
+                if (operationCounter === 490) {
+                  batches.push(db.batch());
+                  batchIndex++;
+                  operationCounter = 0;
+                }
+              });
+
+              // Commit all batches
+              for (const batch of batches) {
+                await batch.commit();
+              }
+              
+              console.log(\`✅ Threat Levels & Ranks Updated for \${usersList.length} Agents.\`);
+
             } catch (err) {
               console.error("❌ Sync Error:", err.message);
             }
