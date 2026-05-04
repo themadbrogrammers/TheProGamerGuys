@@ -31,24 +31,34 @@ jobs:
           const CHANNEL_ID = process.env.CHANNEL_ID;
 
           async function run() {
-            const res = await axios.get(
-              \`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=\${CHANNEL_ID}&key=\${API_KEY}\`
-            );
+            try {
+              // 1. Fetch YouTube Subs
+              const res = await axios.get(
+                \`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=\${CHANNEL_ID}&key=\${API_KEY}\`
+              );
+              const subs = parseInt(res.data.items[0].statistics.subscriberCount);
 
-            const subs = parseInt(res.data.items[0].statistics.subscriberCount);
+              // 2. 🔥 THE MATH ENGINE (Adjust the denominators to whatever your actual goals are!)
+              const rare = Math.min(1.0, subs / 1000);
+              const legendary = Math.min(1.0, subs / 10000);
+              const goldPass = Math.min(1.0, subs / 20000); // <-- THE GOLD PASS MATH!
 
-            // 🔥 your logic
-            const rare = Math.min(1, subs / 1000);
-            const legendary = Math.min(1, subs / 10000);
+              // (Optional) If you are updating IG manually for now, we just don't touch epic/common here.
+              // But if you ever automate them, you'd calculate them here.
 
-            await db.collection("config").doc("giveaways").set({
-              rare_progress: Number(rare.toFixed(3)),
-              legendary_progress: Number(legendary.toFixed(3)),
-              live_yt_subs: subs,
-              last_synced: new Date()
-            }, { merge: true });
+              // 3. Push to Firebase
+              await db.collection("config").doc("giveaways").set({
+                rare_progress: Number(rare.toFixed(3)),
+                legendary_progress: Number(legendary.toFixed(3)),
+                gold_pass_progress: Number(goldPass.toFixed(3)), // <-- INJECTED HERE!
+                live_yt_subs: subs,
+                last_synced: new Date()
+              }, { merge: true }); // Merge ensures we don't accidentally delete Epic/Common!
 
-            console.log("Updated subs:", subs);
+              console.log("✅ Matrix Synced. Subs:", subs);
+            } catch (err) {
+              console.error("❌ Sync Error:", err.message);
+            }
           }
 
           run();
