@@ -39,9 +39,9 @@ jobs:
               const subs = parseInt(res.data.items[0].statistics.subscriberCount);
 
               // 2. 🔥 THE MATH ENGINE (Adjust the denominators to whatever your actual goals are!)
-              const rare = Math.min(1.0, subs / 1000);
-              const legendary = Math.min(1.0, subs / 10000);
-              const goldPass = Math.min(1.0, subs / 20000); // <-- THE GOLD PASS MATH!
+              const rare = Math.min(1.0, subs / 300);
+              const legendary = Math.min(1.0, subs / 500);
+              const goldPass = Math.min(1.0, subs / 400); // <-- THE GOLD PASS MATH!
 
               // (Optional) If you are updating IG manually for now, we just don't touch epic/common here.
               // But if you ever automate them, you'd calculate them here.
