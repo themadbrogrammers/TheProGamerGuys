@@ -76,7 +76,7 @@ jobs:
                 const oldRank = data.rank || 0;
                 
                 // Threat Formula
-                const threatLevel = Math.floor((coins * 0.072) + (streak * 7) + (luck * 3));
+                const threatLevel = Math.floor((coins * 0.0072) + (streak * 7) + (luck * 3));
                 
                 usersList.push({
                   ref: doc.ref,
