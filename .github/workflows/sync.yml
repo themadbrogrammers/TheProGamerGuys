@@ -33,13 +33,17 @@ jobs:
           async function run() {
             try {
               // ==========================================
-              // 1. YOUTUBE MILESTONE ENGINE
+              // 1. FETCH YOUTUBE SUBS
               // ==========================================
               const res = await axios.get(
                 \`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=\${CHANNEL_ID}&key=\${API_KEY}\`
               );
               const subs = parseInt(res.data.items[0].statistics.subscriberCount);
+              console.log("📺 Live Subs:", subs);
 
+              // ==========================================
+              // 2. GIVEAWAY MILESTONE ENGINE
+              // ==========================================
               const configSnap = await db.collection("config").doc("giveaways").get();
               const config = configSnap.data() || {};
 
@@ -59,15 +63,42 @@ jobs:
                 last_synced: new Date()
               }, { merge: true });
 
-              console.log("✅ Matrix Synced. Subs:", subs);
+              console.log("✅ Giveaway Matrix Synced.");
 
               // ==========================================
-              // 2. GLOBAL THREAT LEVEL & RANKING ENGINE
+              // 3. BLACK MARKET AUTOMATION ENGINE 🔥 (NEW)
+              // ==========================================
+              const marketRef = db.collection("black_market").doc("live_auction");
+              const marketSnap = await marketRef.get();
+              
+              if (marketSnap.exists) {
+                const marketData = marketSnap.data();
+                
+                // Parse goal text, removing commas if they put "10,000"
+                const targetText = (marketData.yt_goal_text || "1000").replace(/,/g, '');
+                const marketTarget = parseInt(targetText, 10) || 1000;
+                
+                let marketProgress = subs / marketTarget;
+                if (marketProgress > 1.0) marketProgress = 1.0;
+
+                let marketUpdates = { yt_progress: Number(marketProgress.toFixed(3)) };
+
+                // Automatically trigger the drop toggle if goal reached!
+                if (marketProgress >= 1.0 && marketData.goal_reached === false) {
+                  marketUpdates.goal_reached = true;
+                  console.log("🚀 BLACK MARKET GOAL REACHED! Triggering Auto-Drop.");
+                }
+
+                await marketRef.update(marketUpdates);
+                console.log(\`✅ Black Market Synced. Progress: \${marketUpdates.yt_progress}\`);
+              }
+
+              // ==========================================
+              // 4. GLOBAL THREAT LEVEL & RANKING ENGINE
               // ==========================================
               const usersSnap = await db.collection("users").get();
               let usersList = [];
 
-              // Calculate Threat Level for all users
               usersSnap.forEach(doc => {
                 const data = doc.data();
                 const coins = data.coins || 0;
@@ -75,7 +106,6 @@ jobs:
                 const luck = data.luck_multiplier || 0;
                 const oldRank = data.rank || 0;
                 
-                // Threat Formula
                 const threatLevel = Math.floor((coins * 0.0072) + (streak * 7) + (luck * 3));
                 
                 usersList.push({
@@ -85,17 +115,14 @@ jobs:
                 });
               });
 
-              // Sort highest to lowest
               usersList.sort((a, b) => b.threatLevel - a.threatLevel);
 
-              // Create batches (Firestore limit is 500 ops per batch)
               const batches = [db.batch()];
               let operationCounter = 0;
               let batchIndex = 0;
 
-              // Assign ranks and queue updates
               usersList.forEach((user, index) => {
-                const newRank = index + 1; // Rank 1, 2, 3...
+                const newRank = index + 1;
 
                 batches[batchIndex].update(user.ref, {
                   threat_level: user.threatLevel,
@@ -111,7 +138,6 @@ jobs:
                 }
               });
 
-              // Commit all batches
               for (const batch of batches) {
                 await batch.commit();
               }
