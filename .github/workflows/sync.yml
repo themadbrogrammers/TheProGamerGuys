@@ -106,7 +106,7 @@ jobs:
                 const luck = data.luck_multiplier || 0;
                 const oldRank = data.rank || 0;
                 
-                const threatLevel = Math.floor((coins * 0.0072) + (streak * 7) + (luck * 3));
+                const threatLevel = Math.floor((coins * 0.00067) + (streak * 7) + (luck * 3));
                 
                 usersList.push({
                   ref: doc.ref,
