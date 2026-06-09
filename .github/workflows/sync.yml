@@ -13,7 +13,7 @@ jobs:
       - name: Run script
         run: |
           npm init -y
-          npm install axios firebase-admin
+          npm install axios firebase-admin@12
 
           node <<EOF
           const admin = require("firebase-admin");
